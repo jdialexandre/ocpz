@@ -1,0 +1,59 @@
+*********************
+
+1. SSH key 
+	a. Gerar o ssh-key (acho que já foi gerado) 
+	b. eval "$(ssh-agent -s)"
+	c. ssh-add <path>/<file_name> (acho que já foi feito tbm ? ) 
+
+2. Criar folder para os artefatos
+	a. mkdir -p ~/ocp47/install
+	b. copiar o install-config.yaml para  ~/ocp47/install
+	c. install-config.yaml: baseDomain: vou passar no chat
+	d. install-config.yaml:  metadata.name: ocpz
+	e. install-config.yaml: atualizar o pull secret e ssh-key 
+	f. install-config.yaml: abaixo de baseDomain, no mesmo nível, adicionar:
+proxy:
+  httpProxy: http://<username>:<pswd>@<ip>:<port> 
+  httpsProxy: https://<username>:<pswd>@<ip>:<port> 
+  noProxy: vou-passar-no-chat
+
+3. Gerar ignitions
+	a. cd ~/ocp47
+	b. Backup do install-config.yaml para outro folder, pois ele é "consumido" durante a produção dos ignitions
+	c. ./openshift-install create manifests --dir ./install
+	d. vi ./install/manifests/cluster-scheduler-02-config.yml e colocar mastersSchedulable para false
+	e. ./openshift-install create ignition-configs --dir=./install
+
+4. Confirmar que o httpd server está servindo os ignitions e os binários no mesmo path setado no .parm 
+
+5. zVM Exec
+	- subir bootstrap, esperar subir
+	- subir os masters, workers, infra na sequencia, tentar fazer antes dos 20 min que o openshift-config install fica monitorando
+
+6. Monitorar processo do bootstrap 
+./openshift-install --dir=./install wait-for bootstrap-complete --log-level=info
+
+ssh -i ~/.ssh/ssh-key-criada core@bootstrap-ip
+journalctl -b -f -u bootkube.service
+
+
+7. Exportar kubeconfig
+export KUBECONFIG=~/ocp47/install/auth/kubeconfig
+
+8. Aceitar certificados
+
+watch oc get csr
+oc adm certificate approve <certificate-name>
+
+9. Monitorar instalação
+oc get clusterversion
+oc get clusteroperators
+
+10. Image registry para não produção
+oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"storage":{"emptyDir":{}}}}'
+
+11. Criar oauth 
+
+htpasswd -Bb htpasswd user 'pwd'
+oc --user=admin create secret generic htpasswd --from-file=htpasswd -n openshift-config
+oc create secret generic htpasswd --from-file=htpasswd -n openshift-config
